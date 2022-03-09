@@ -173,9 +173,6 @@ static void decode_message(pn_message_t* m, pn_delivery_t* d, pn_rwbytes_t* buf)
 }
 
 static void print_message(pn_message_t* m) {
-    pn_atom_t id_atom = pn_message_get_id(m);
-    ASSERT(id_atom.type == PN_STRING);
-    pn_bytes_t id = id_atom.u.as_bytes;
     pn_data_t* props = pn_message_properties(m);
     pn_data_rewind(props);
     ASSERT(pn_data_next(props));
@@ -184,26 +181,16 @@ static void print_message(pn_message_t* m) {
     ASSERT(pn_data_next(props));
     ASSERT(pn_data_type(props) == PN_STRING);
     pn_bytes_t key = pn_data_get_string(props);
-    // if (!bytes_equal(key, SEND_TIME)) {
-    //     FAIL("Unexpected property name: %.*s", key.start, key.size);
-    // }
     ASSERT(pn_data_next(props));
     ASSERT(pn_data_type(props) == PN_LONG);
     int64_t stime = pn_data_get_long(props);
     ASSERT(pn_data_exit(props));
-    printf("%s,%" PRId64 ",%" PRId64 "\n", id.start, stime, now());
+    printf("%" PRId64 ",%" PRId64 "\n", stime, now());
 }
 
 static void send_message(struct arrow* a, pn_link_t* l) {
     a->sent++;
     int64_t stime = now();
-    pn_atom_t id_atom;
-    char id_str[20];
-    int id_len = snprintf(id_str, 20, "%zu", a->sent);
-    ASSERT(id_len > 0 && id_len < 20);
-    id_atom.type = PN_STRING;
-    id_atom.u.as_bytes = pn_bytes(id_len + 1, id_str);
-    pn_message_set_id(a->message, id_atom);
     pn_data_t* props = pn_message_properties(a->message);
     pn_data_clear(props);
     ASSERT(!pn_data_put_map(props));
@@ -217,7 +204,6 @@ static void send_message(struct arrow* a, pn_link_t* l) {
     pn_delivery(l, pn_dtag((const char* )&a->sent, sizeof(a->sent)));
     ASSERT(size == pn_link_send(l, a->buffer.start, size));
     ASSERT(pn_link_advance(l));
-    printf("%s,%" PRId64 "\n", id_str, stime);
 }
 
 static void fail_if_condition(pn_event_t* e, pn_condition_t* cond) {
