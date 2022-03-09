@@ -13,8 +13,14 @@ listener {{
 }}
 """
 
+@command
+def build(app):
+    run("gcc pellmell.c -o pellmell -g -O2 -std=c99 -fno-omit-frame-pointer -lqpid-proton -lqpid-proton-proactor")
+
 @command(name="run")
 def run_(app):
+    build(app)
+
     host = "localhost"
     port = 45672
     config = config_template.format(host, port)
@@ -28,3 +34,8 @@ def run_(app):
 
     count = int(call("wc -l transfers").split()[0])
     print(">>", count // 30, "<<")
+
+@command
+def clean(app):
+    remove("pellmell")
+    remove("transfers")
