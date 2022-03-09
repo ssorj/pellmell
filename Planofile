@@ -1,0 +1,30 @@
+config_template = """
+router {{
+    mode: standalone
+    id: quiver-test-router
+}}
+
+listener {{
+    host: {}
+    port: {}
+    linkCapacity: 1000
+    authenticatePeer: off
+    saslMechanisms: ANONYMOUS
+}}
+"""
+
+@command(name="run")
+def run_(app):
+    host = "localhost"
+    port = 45672
+    config = config_template.format(host, port)
+    config_file = write(make_temp_file(), config)
+
+    with start(f"qdrouterd --config {config_file}"):
+        await_port(45672)
+
+        with start("./pellmell receive", stdout="transfers"):
+            run("./pellmell send", stdout=DEVNULL)
+
+    count = int(call("wc -l transfers").split()[0])
+    print(">>", count // 30, "<<")
