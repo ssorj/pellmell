@@ -39,7 +39,9 @@ def run_(app):
             with start("./pellmell receive", stdout=transfers_file):
                 with start("./pellmell send"):
                     sleep(10)
-                    run(f"perf stat -d -d -p {router.pid} --timeout 10000")
+                    # run(f"perf stat -d -d -p {router.pid} --timeout 10000")
+                    # run(f"perf record -g -p {router.pid} sleep 10")
+                    run(f"perf script flamegraph -F 997 --call-graph dwarf -p {router.pid} sleep 10")
                     sleep(10)
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
