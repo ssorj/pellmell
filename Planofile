@@ -34,10 +34,10 @@ def run_(app):
         with start(f"pidstat 2 --human -t -p {router.pid}"):
             await_port(45672)
 
-            with start("./pellmell receive", stdout="transfers"):
+            with start("./pellmell receive", stdout="/tmp/pellmell-transfers"):
                 run("./pellmell send")
 
-    count = int(call("wc -l transfers").split()[0])
+    count = int(call("wc -l /tmp/pellmell-transfers").split()[0])
     print(">>", count // 30, "<<")
 
 @command
