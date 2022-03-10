@@ -21,6 +21,7 @@ def build(app):
 def run_(app):
     build(app)
 
+    check_program("perf")
     check_program("pidstat")
     check_program("qdrouterd")
     check_program("wc")
@@ -29,15 +30,19 @@ def run_(app):
     port = 45672
     config = config_template.format(host, port)
     config_file = write(make_temp_file(), config)
+    transfers_file = make_temp_file()
 
     with start(f"qdrouterd --config {config_file}") as router:
         with start(f"pidstat 2 --human -t -p {router.pid}"):
             await_port(45672)
 
-            with start("./pellmell receive", stdout="/tmp/pellmell-transfers"):
-                run("./pellmell send")
+            with start("./pellmell receive", stdout=transfers_file):
+                with start("./pellmell send"):
+                    sleep(10)
+                    run(f"perf stat -d -d -p {router.pid} --timeout 10000")
+                    sleep(10)
 
-    count = int(call("wc -l /tmp/pellmell-transfers").split()[0])
+    count = int(call(f"wc -l {transfers_file}").split()[0])
     print(">>", count // 30, "<<")
 
 @command
