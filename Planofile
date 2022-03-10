@@ -43,4 +43,3 @@ def run_(app):
 @command
 def clean(app):
     remove("pellmell")
-    remove("transfers")
