@@ -25,7 +25,7 @@ def clean(app):
 def check_env(app):
     check_program("perf")
     check_program("pidstat")
-    check_program("qdrouterd")
+    check_program("skrouterd")
     check_program("wc")
 
     # echo -1 > /proc/sys/kernel/perf_event_paranoid
@@ -41,7 +41,7 @@ def run_(app):
     check_env(app)
     build(app)
 
-    with start(f"qdrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {config_file}") as router:
         with start(f"pidstat 2 --human -t -p {router.pid}"):
             await_port(45672)
 
@@ -60,7 +60,7 @@ def flamegraph(app):
     check_env(app)
     build(app)
 
-    with start(f"qdrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
@@ -77,7 +77,7 @@ def record(app):
     check_env(app)
     build(app)
 
-    with start(f"qdrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
