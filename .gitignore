@@ -1,3 +1,4 @@
 /pellmell
-/flamegraph.html
-/perf.data
+/flamegraph.html*
+/perf.data*
+__pycache__/
