@@ -15,9 +15,10 @@ listener {{
 
 @command
 def check(app):
-    check_program("perf", "Run 'dnf install perf'")
-    check_program("pidstat", "Run 'dnf install sysstat'")
-    check_program("skrouterd", "Make sure skrouterd is on the path")
+    check_program("gcc", "I can't find gcc.  Run 'dnf install gcc'.")
+    check_program("perf", "I can't find the perf tools.  Run 'dnf install perf'.")
+    check_program("pidstat", "I can't find pidstat.  Run 'dnf install sysstat'.")
+    check_program("skrouterd", "I can't find skrouterd.  Make sure it is on the path")
 
     perf_event_paranoid = read("/proc/sys/kernel/perf_event_paranoid")
 
