@@ -57,7 +57,7 @@ def run_(app):
                     sleep(20)
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 30, "<<")
+    print(">>", count // 20, "<<")
 
 @command
 def flamegraph(app):
@@ -70,11 +70,14 @@ def flamegraph(app):
         with start("./pellmell receive", stdout=transfers_file):
             with start("./pellmell send"):
                 sleep(10)
-                move("flamegraph.html", "flamegraph.html.old")
+
+                if exists("flamegraph.html"):
+                    move("flamegraph.html", "flamegraph.html.old")
+
                 run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep 10")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 30, "<<")
+    print(">>", count // 20, "<<")
 
 @command
 def stat(app):
@@ -90,7 +93,7 @@ def stat(app):
                 run(f"perf stat --detailed -p {router.pid} sleep 10")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 30, "<<")
+    print(">>", count // 20, "<<")
 
 @command
 def record(app):
@@ -104,10 +107,9 @@ def record(app):
             with start("./pellmell send"):
                 sleep(10)
                 run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep 10")
-                sleep(10)
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 30, "<<")
+    print(">>", count // 20, "<<")
 
 @command
 def stat(app):
@@ -121,7 +123,6 @@ def stat(app):
             with start("./pellmell send"):
                 sleep(10)
                 run(f"perf stat -d -p {router.pid} sleep 10")
-                sleep(10)
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 30, "<<")
+    print(">>", count // 20, "<<")
