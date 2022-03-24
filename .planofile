@@ -1,4 +1,4 @@
-config_template = """
+router_config_template = """
 router {{
     mode: standalone
     id: quiver-test-router
@@ -12,6 +12,26 @@ listener {{
     saslMechanisms: ANONYMOUS
 }}
 """
+
+router_host = "localhost"
+router_port = 45672
+router_config = router_config_template.format(router_host, router_port)
+router_config_file = write(make_temp_file(), router_config)
+
+transfers_file = make_temp_file()
+
+duration_arg = CommandArgument("duration", default=10, positional=False,
+                               help="The time to run (excluding warmup) in seconds")
+warmup_arg = CommandArgument("warmup", default=10, positional=False,
+                             help="Warmup time in seconds")
+
+@command
+def clean(app):
+    remove("pellmell")
+    remove("perf.data")
+    remove("perf.data.old")
+    remove("flamegraph.html")
+    remove("flamegraph.html.old")
 
 @command
 def check(app):
@@ -27,102 +47,92 @@ def check(app):
 
 @command
 def build(app):
+    check(app)
     run("gcc pellmell.c -o pellmell -g -O2 -std=c99 -fno-omit-frame-pointer -lqpid-proton -lqpid-proton-proactor")
 
-@command
-def clean(app):
-    remove("pellmell")
-    remove("perf.data")
-    remove("perf.data.old")
-    remove("flamegraph.html")
-    remove("flamegraph.html.old")
-
-host = "localhost"
-port = 45672
-config = config_template.format(host, port)
-config_file = write(make_temp_file(), config)
-transfers_file = make_temp_file()
-
-@command
-def run_(app):
+@command(args=[duration_arg])
+def run_(app, duration=10):
     check(app)
     build(app)
 
-    with start(f"skrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {router_config_file}") as router:
         with start(f"pidstat 2 --human -t -p {router.pid}"):
             await_port(45672)
 
             with start("./pellmell receive", stdout=transfers_file):
                 with start("./pellmell send"):
-                    sleep(20)
+                    sleep(duration)
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 20, "<<")
+    print(">>", count // duration, "<<")
 
-@command
-def flamegraph(app):
-    check(app)
+@command(args=[duration_arg, warmup_arg])
+def flamegraph(app, duration=10, warmup=10):
     build(app)
 
-    with start(f"skrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
             with start("./pellmell send"):
-                sleep(10)
+                sleep(warmup)
 
                 if exists("flamegraph.html"):
                     move("flamegraph.html", "flamegraph.html.old")
 
-                run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep 10")
+                run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep {duration}")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 20, "<<")
+    print(">>", count // (warmup + duration), "<<")
 
-@command
-def stat(app):
-    check(app)
+@command(args=[duration_arg, warmup_arg])
+def stat(app, duration=10, warmup=10):
     build(app)
 
-    with start(f"skrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
             with start("./pellmell send"):
-                sleep(10)
-                run(f"perf stat --detailed -p {router.pid} sleep 10")
+                sleep(warmup)
+                run(f"perf stat --detailed -p {router.pid} sleep {duration}")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 20, "<<")
+    print(">>", count // warmup + duration, "<<")
 
-@command
-def record(app):
-    check(app)
+@command(args=[duration_arg, warmup_arg])
+def record(app, duration=10, warmup=10):
     build(app)
 
-    with start(f"skrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
             with start("./pellmell send"):
-                sleep(10)
-                run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep 10")
+                sleep(warmup)
+                run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep {duration}")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 20, "<<")
+    print(">>", count // (warmup + duration), "<<")
 
-@command
-def stat(app):
-    check(app)
+@command(args=[duration_arg, warmup_arg])
+def stat(app, duration=10, warmup=10):
     build(app)
 
-    with start(f"skrouterd --config {config_file}") as router:
+    with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
         with start("./pellmell receive", stdout=transfers_file):
             with start("./pellmell send"):
-                sleep(10)
-                run(f"perf stat -d -p {router.pid} sleep 10")
+                sleep(warmup)
+                run(f"perf stat -d -p {router.pid} sleep {duration}")
 
     count = int(call(f"wc -l {transfers_file}").split()[0])
-    print(">>", count // 20, "<<")
+    print(">>", count // (warmup + duration), "<<")
+
+@command
+def self_test(app):
+    run_(app, duration=0.1)
+    flamegraph(app, duration=0.1, warmup=0.1)
+    record(app, duration=0.1, warmup=0.1)
+    stat(app, duration=0.1, warmup=0.1)
