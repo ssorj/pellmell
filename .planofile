@@ -54,9 +54,17 @@ def outer(inner):
     with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
-        with start("./pellmell receive", stdout=transfers_file):
-            with start("./pellmell send"):
-                inner(router)
+        transfers_file_1 = make_temp_file()
+        transfers_file_2 = make_temp_file()
+
+        with start("./pellmell receive", stdout=transfers_file_1):
+            with start("./pellmell receive", stdout=transfers_file_2):
+                with start("./pellmell send"):
+                    with start("./pellmell send"):
+                        inner(router)
+
+        append(transfers_file, read(transfers_file_1))
+        append(transfers_file, read(transfers_file_2))
 
 @command(args=[duration_arg])
 def run_(app, duration=10):
