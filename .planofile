@@ -80,7 +80,7 @@ def outer(inner, pairs):
             append(transfers_file, read(file))
 
 @command(args=standard_args)
-def stat(app, duration=10, warmup=10, pairs=2):
+def stat(app, duration, warmup, pairs):
     build(app)
 
     def inner(router):
@@ -94,7 +94,7 @@ def stat(app, duration=10, warmup=10, pairs=2):
     print(">>", count // warmup + duration, "<<")
 
 @command(args=standard_args)
-def flamegraph(app, duration=10, warmup=10, pairs=2):
+def flamegraph(app, duration, warmup, pairs):
     build(app)
 
     def inner(router):
@@ -111,7 +111,7 @@ def flamegraph(app, duration=10, warmup=10, pairs=2):
     print(">>", count // (warmup + duration), "<<")
 
 @command(args=standard_args)
-def record(app, duration=10, warmup=10, pairs=2):
+def record(app, duration, warmup, pairs):
     build(app)
 
     def inner(router):
@@ -125,7 +125,7 @@ def record(app, duration=10, warmup=10, pairs=2):
 
 @command
 def self_test(app):
-    flamegraph(app, duration=0.1, warmup=0.1)
-    stat(app, duration=0.1, warmup=0.1)
-    record(app, duration=0.1, warmup=0.1)
+    flamegraph(app, duration=0.1, warmup=0.1, pairs=1)
+    stat(app, duration=0.1, warmup=0.1, pairs=1)
+    record(app, duration=0.1, warmup=0.1, pairs=1)
     clean(app)
