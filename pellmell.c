@@ -458,7 +458,7 @@ int main(size_t argc, char** argv) {
     a.host = "localhost";
     a.port = "45672";
     a.path = "pellmell";
-    a.desired_duration = 30;
+    a.desired_duration = 0;
     a.body_size = 100;
     a.credit_window = 1000;
 
