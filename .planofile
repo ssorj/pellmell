@@ -136,3 +136,4 @@ def self_test(app):
     flamegraph(app, duration=0.1, warmup=0.1)
     record(app, duration=0.1, warmup=0.1)
     stat(app, duration=0.1, warmup=0.1)
+    clean(app)
