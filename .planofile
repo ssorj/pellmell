@@ -20,8 +20,6 @@ router_port = 45672
 router_config = router_config_template.format(router_host, router_port)
 router_config_file = write(make_temp_file(), router_config)
 
-transfers_file = make_temp_file()
-
 standard_args = (
     CommandArgument("duration", default=10, positional=False,
                     help="The time to run (excluding warmup) in seconds"),
@@ -33,14 +31,22 @@ standard_args = (
 
 @command
 def clean(app):
+    """
+    Remove build artifacts and output files
+    """
     remove("pellmell")
     remove("perf.data")
     remove("perf.data.old")
     remove("flamegraph.html")
     remove("flamegraph.html.old")
+    remove("transfers.csv")
+    remove("transfers.csv.old")
 
 @command
 def check(app):
+    """
+    Check for required programs and system configuration
+    """
     check_program("gcc", "I can't find gcc.  Run 'dnf install gcc'.")
     check_program("perf", "I can't find the perf tools.  Run 'dnf install perf'.")
     check_program("pidstat", "I can't find pidstat.  Run 'dnf install sysstat'.")
@@ -53,81 +59,92 @@ def check(app):
 
 @command
 def build(app):
+    """
+    Compile the load generator
+    """
     check(app)
     run("gcc pellmell.c -o pellmell -g -O2 -std=c99 -fno-omit-frame-pointer -lqpid-proton -lqpid-proton-proactor")
 
-def run_outer(inner, pairs):
+def run_outer(inner, pairs, warmup):
     client_procs = list()
-    transfers_files = list()
+    output_files = list()
 
     with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
 
         for i in range(pairs):
-            transfers = make_temp_file()
-            transfers_files.append(transfers)
+            file = make_temp_file()
+            output_files.append(file)
 
-            client_procs.append(start("./pellmell receive", stdout=transfers))
+            client_procs.append(start("./pellmell receive", stdout=file))
             client_procs.append(start("./pellmell send"))
 
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
+                sleep(warmup)
                 inner(router)
         finally:
             for proc in client_procs:
                 kill(proc)
 
-        for file in transfers_files:
-            append(transfers_file, read(file))
+        if exists("transfers.csv"):
+            move("transfers.csv", "transfers.csv.old")
+
+        for file in output_files:
+            append("transfers.csv", read(file))
+            remove(file)
 
 def print_transfers(duration):
-    count = int(call(f"wc -l {transfers_file}").split()[0])
+    count = int(call(f"wc -l transfers.csv").split()[0])
 
     print()
-    print(">> {:,} messages per second <<".format(count / duration))
+    print(">> {:,} messages per second <<".format(count // duration))
+    print()
 
 @command(args=standard_args)
 def stat(app, pairs, duration, warmup):
     build(app)
 
-    with temp_file() as stat_output:
+    with temp_file() as output:
         def inner(router):
-            sleep(warmup)
-            run(f"perf stat --detailed -p {router.pid} sleep {duration}", stderr=stat_output)
+            run(f"perf stat --detailed -p {router.pid} sleep {duration}", output=output)
 
-        run_outer(inner, pairs)
+        run_outer(inner, pairs, warmup)
+
         print_transfers(duration + warmup)
-        print(read(stat_output))
+
+        print(read(output))
 
 @command(args=standard_args)
 def flamegraph(app, pairs, duration, warmup):
     build(app)
 
-    def inner(router):
-        sleep(warmup)
+    with temp_file() as output:
+        def inner(router):
+            if exists("flamegraph.html"):
+                move("flamegraph.html", "flamegraph.html.old")
 
-        if exists("flamegraph.html"):
-            move("flamegraph.html", "flamegraph.html.old")
+            run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", stdout=output)
 
-        run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep {duration}")
+        run_outer(inner, pairs, warmup)
 
-    run_outer(inner, pairs)
-    print_transfers(duration + warmup)
+        print_transfers(duration + warmup)
 
-    # XXX print flamegraph file location
+        print(read(output))
 
 @command(args=standard_args)
 def record(app, pairs, duration, warmup):
     build(app)
 
-    def inner(router):
-        sleep(warmup)
-        run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep {duration}")
+    with temp_file() as output:
+        def inner(router):
+            run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", output=output)
 
-    run_outer(inner, pairs)
-    print_transfers(duration + warmup)
+        run_outer(inner, pairs, warmup)
 
-    # XXX print what to do with the data
+        print_transfers(duration + warmup)
+
+        print(read(output))
 
 @command
 def self_test(app):
