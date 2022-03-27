@@ -80,6 +80,9 @@ def run_outer(inner, pairs, warmup):
 
     with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
+        await_port(45673)
+
+        client_procs.append(start("nc -e /bin/cat -kl 45674", stdout=DEVNULL))
 
         for i in range(pairs):
             file = make_temp_file()
@@ -88,8 +91,7 @@ def run_outer(inner, pairs, warmup):
             # client_procs.append(start("./pellmell receive", stdout=file))
             # client_procs.append(start("./pellmell send"))
 
-            client_procs.append(start("nc -kl 45674", stdout="/dev/null"))
-            client_procs.append(start("./ync localhost 45673"))
+            client_procs.append(start("./ync localhost 45673", stdout=DEVNULL))
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
                 sleep(warmup)
