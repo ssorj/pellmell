@@ -1,23 +1,32 @@
 # -*- mode: python -*-
 
-router_config_template = """
-router {{
+router_config = """
+router {
     mode: standalone
-    id: quiver-test-router
-}}
+    id: pellmell-test-router
+}
 
-listener {{
-    host: {}
-    port: {}
+listener {
+    host: localhost
+    port: 45672
     linkCapacity: 1000
     authenticatePeer: off
     saslMechanisms: ANONYMOUS
-}}
+}
+
+tcpListener {
+    address: xxx
+    host: localhost
+    port: 45673
+}
+
+tcpConnector {
+    address: xxx
+    host: localhost
+    port: 45674
+}
 """
 
-router_host = "localhost"
-router_port = 45672
-router_config = router_config_template.format(router_host, router_port)
 router_config_file = write(make_temp_file(), router_config)
 
 standard_args = (
@@ -79,6 +88,8 @@ def run_outer(inner, pairs, warmup):
             client_procs.append(start("./pellmell receive", stdout=file))
             client_procs.append(start("./pellmell send"))
 
+            # client_procs.append(start("nc -kl 45674", stdout=file))
+            # client_procs.append(start("yes | nc localhost 45673", shell=True))
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
                 sleep(warmup)
