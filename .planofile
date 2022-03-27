@@ -85,11 +85,11 @@ def run_outer(inner, pairs, warmup):
             file = make_temp_file()
             output_files.append(file)
 
-            client_procs.append(start("./pellmell receive", stdout=file))
-            client_procs.append(start("./pellmell send"))
+            # client_procs.append(start("./pellmell receive", stdout=file))
+            # client_procs.append(start("./pellmell send"))
 
-            # client_procs.append(start("nc -kl 45674", stdout=file))
-            # client_procs.append(start("yes | nc localhost 45673", shell=True))
+            client_procs.append(start("nc -kl 45674", stdout="/dev/null"))
+            client_procs.append(start("./ync localhost 45673"))
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
                 sleep(warmup)
