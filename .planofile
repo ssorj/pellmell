@@ -15,13 +15,13 @@ listener {
 }
 
 tcpListener {
-    address: xxx
+    address: pellmell/tcp
     host: localhost
     port: 45673
 }
 
 tcpConnector {
-    address: xxx
+    address: pellmell/tcp
     host: localhost
     port: 45674
 }
@@ -34,22 +34,9 @@ standard_args = (
                     help="The time to run (excluding warmup) in seconds"),
     CommandArgument("warmup", default=10, positional=False,
                     help="Warmup time in seconds"),
-    CommandArgument("pairs", default=2, positional=False,
-                    help="The number of sender/receiver pairs"),
+    CommandArgument("jobs", default=2, positional=False,
+                    help="The number of concurrent client workloads"),
 )
-
-@command
-def clean(app):
-    """
-    Remove build artifacts and output files
-    """
-    remove("pellmell")
-    remove("perf.data")
-    remove("perf.data.old")
-    remove("flamegraph.html")
-    remove("flamegraph.html.old")
-    remove("transfers.csv")
-    remove("transfers.csv.old")
 
 @command
 def check(app):
@@ -67,6 +54,19 @@ def check(app):
         exit("Perf events are not enabled.  Run 'echo -1 > /proc/sys/kernel/perf_event_paranoid' as root.")
 
 @command
+def clean(app):
+    """
+    Remove build artifacts and output files
+    """
+    remove("pellmell")
+    remove("perf.data")
+    remove("perf.data.old")
+    remove("flamegraph.html")
+    remove("flamegraph.html.old")
+    remove("transfers.csv")
+    remove("transfers.csv.old")
+
+@command
 def build(app):
     """
     Compile the load generator
@@ -74,7 +74,7 @@ def build(app):
     check(app)
     run("gcc pellmell.c -o pellmell -g -O2 -std=c99 -fno-omit-frame-pointer -lqpid-proton -lqpid-proton-proactor")
 
-def run_outer(inner, pairs, warmup):
+def run_outer(inner, jobs, warmup):
     client_procs = list()
     output_files = list()
 
@@ -82,16 +82,16 @@ def run_outer(inner, pairs, warmup):
         await_port(45672)
         await_port(45673)
 
-        client_procs.append(start("nc -e /bin/cat -kl 45674", stdout=DEVNULL))
+        # client_procs.append(start("nc -e /bin/cat -kl 45674", stdout=DEVNULL))
 
-        for i in range(pairs):
+        for i in range(jobs):
             file = make_temp_file()
             output_files.append(file)
 
-            # client_procs.append(start("./pellmell receive", stdout=file))
-            # client_procs.append(start("./pellmell send"))
+            client_procs.append(start("./pellmell receive", stdout=file))
+            client_procs.append(start("./pellmell send"))
 
-            client_procs.append(start("./ync localhost 45673", stdout=DEVNULL))
+            # client_procs.append(start("./ync localhost 45673", stdout=DEVNULL))
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
                 sleep(warmup)
@@ -115,21 +115,27 @@ def print_transfers(duration):
     print()
 
 @command(args=standard_args)
-def stat(app, pairs, duration, warmup):
+def stat(app, jobs, duration, warmup):
+    """
+    Run the workload and capture 'perf stat' output
+    """
     build(app)
 
     with temp_file() as output:
         def inner(router):
             run(f"perf stat --detailed -p {router.pid} sleep {duration}", output=output)
 
-        run_outer(inner, pairs, warmup)
+        run_outer(inner, jobs, warmup)
 
         print_transfers(duration + warmup)
 
         print(read(output))
 
 @command(args=standard_args)
-def flamegraph(app, pairs, duration, warmup):
+def flamegraph(app, jobs, duration, warmup):
+    """
+    Run the workload and generate a flamegraph
+    """
     build(app)
 
     with temp_file() as output:
@@ -139,21 +145,24 @@ def flamegraph(app, pairs, duration, warmup):
 
             run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", stdout=output)
 
-        run_outer(inner, pairs, warmup)
+        run_outer(inner, jobs, warmup)
 
         print_transfers(duration + warmup)
 
         print(read(output))
 
 @command(args=standard_args)
-def record(app, pairs, duration, warmup):
+def record(app, jobs, duration, warmup):
+    """
+    Run the workload and capture perf events using 'perf record'
+    """
     build(app)
 
     with temp_file() as output:
         def inner(router):
             run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", output=output)
 
-        run_outer(inner, pairs, warmup)
+        run_outer(inner, jobs, warmup)
 
         print_transfers(duration + warmup)
 
@@ -161,7 +170,10 @@ def record(app, pairs, duration, warmup):
 
 @command
 def self_test(app):
-    flamegraph(app, duration=0.1, warmup=0.1, pairs=1)
-    stat(app, duration=0.1, warmup=0.1, pairs=1)
-    record(app, duration=0.1, warmup=0.1, pairs=1)
+    """
+    Test Pellmell
+    """
+    flamegraph(app, duration=0.1, warmup=0.1, jobs=1)
+    stat(app, duration=0.1, warmup=0.1, jobs=1)
+    record(app, duration=0.1, warmup=0.1, jobs=1)
     clean(app)
