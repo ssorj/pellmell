@@ -3,7 +3,7 @@
 router_config = """
 router {
     mode: standalone
-    id: pellmell-test-router
+    id: pellmell
 }
 
 listener {
@@ -12,18 +12,6 @@ listener {
     linkCapacity: 1000
     authenticatePeer: off
     saslMechanisms: ANONYMOUS
-}
-
-tcpListener {
-    address: pellmell/tcp
-    host: localhost
-    port: 45673
-}
-
-tcpConnector {
-    address: pellmell/tcp
-    host: localhost
-    port: 45674
 }
 """
 
@@ -80,9 +68,6 @@ def run_outer(inner, jobs, warmup):
 
     with start(f"skrouterd --config {router_config_file}") as router:
         await_port(45672)
-        await_port(45673)
-
-        # client_procs.append(start("nc -e /bin/cat -kl 45674", stdout=DEVNULL))
 
         for i in range(jobs):
             file = make_temp_file()
@@ -90,8 +75,6 @@ def run_outer(inner, jobs, warmup):
 
             client_procs.append(start("./pellmell receive", stdout=file))
             client_procs.append(start("./pellmell send"))
-
-            # client_procs.append(start("./ync localhost 45673", stdout=DEVNULL))
         try:
             with start(f"pidstat 2 --human -t -p {router.pid}"):
                 sleep(warmup)
