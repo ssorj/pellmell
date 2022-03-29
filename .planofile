@@ -106,7 +106,7 @@ def stat(app, jobs, duration, warmup):
 
     with temp_file() as output:
         def inner(router):
-            run(f"perf stat --detailed -p {router.pid} sleep {duration}", output=output)
+            run(f"perf stat --detailed --pid {router.pid} sleep {duration}", output=output)
 
         run_outer(inner, jobs, warmup)
 
@@ -126,7 +126,7 @@ def flamegraph(app, jobs, duration, warmup):
             if exists("flamegraph.html"):
                 move("flamegraph.html", "flamegraph.html.old")
 
-            run(f"perf script flamegraph -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", stdout=output)
+            run(f"perf script flamegraph --freq 99 --call-graph dwarf --pid {router.pid} sleep {duration}", stdout=output)
 
         run_outer(inner, jobs, warmup)
 
@@ -143,7 +143,7 @@ def record(app, jobs, duration, warmup):
 
     with temp_file() as output:
         def inner(router):
-            run(f"perf record -F 99 --call-graph dwarf -p {router.pid} sleep {duration}", output=output)
+            run(f"perf record --freq 99 --call-graph dwarf --pid {router.pid} sleep {duration}", output=output)
 
         run_outer(inner, jobs, warmup)
 
